@@ -1,0 +1,80 @@
+mql5
+//+------------------------------------------------------------------+
+//|                                             MarketMaster.mq5    |
+//|                            Copyright 2022, Forex Robot Easy Team |
+//|                                              forexroboteasy.com |
+//+------------------------------------------------------------------+
+#property copyright 'Copyright 2022, Forex Robot Easy Team'
+#property link      'forexroboteasy.com'
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+#define SPREAD_THRESHOLD 10 // maximum acceptable spread in points
+#define STOP_LOSS       100 // stop loss in points
+#define TAKE_PROFIT     200 // take profit in points
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+    // Initialize necessary variables and indicators
+    return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+    double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+    double spread = ask - bid;
+
+    // Check if spread is within acceptable range
+    if (spread > SPREAD_THRESHOLD)
+    {
+        return; // Spread is too high, exit function
+    }
+
+    // Check if there is an open position
+    if (PositionsTotal() > 0)
+    {
+        return; // There is an open position, exit function
+    }
+
+    // Calculate lot size based on free margin
+    double lotSize = AccountFreeMargin() * 0.01 / STOP_LOSS;
+
+    // Open a buy position
+    if (lotSize > 0)
+    {
+        double stopLoss = bid - STOP_LOSS * _Point;
+        double takeProfit = bid + TAKE_PROFIT * _Point;
+        int ticket = OrderSend(_Symbol, OP_BUY, lotSize, bid, 0, stopLoss, takeProfit, 'MarketMaster', 0, 0, Green);
+        if (ticket < 0)
+        {
+            Print('Error opening buy position: ', GetLastError());
+        }
+    }
+}
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+    // Clean up and close any open positions
+    if (PositionsTotal() > 0)
+    {
+        for (int i = 0; i < PositionsTotal(); i++)
+        {
+            ulong ticket = PositionGetTicket(i);
+            if (ticket > 0)
+            {
+                OrderClose(ticket, 0, Bid, 0, Red);
+            }
+        }
+    }
+}
